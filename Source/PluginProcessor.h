@@ -16,6 +16,7 @@ namespace ChoirParam
     static const juce::String mix       = "mix";
     static const juce::String reverbAmount = "reverbAmount";
     static const juce::String reverbSize   = "reverbSize";
+    static const juce::String distance     = "distance";
 }
 
 class ChoirPracticeAudioProcessor : public juce::AudioProcessor
@@ -59,6 +60,12 @@ private:
 
     std::array<ChoirVoice, maxVoices> choirVoices;
     juce::dsp::Reverb reverb;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> reverbPredelay { 4096 };
+
+    // Applies a touch of high-frequency air absorption to the choir as
+    // "Distance" increases, so farther-away voices read as duller as well
+    // as more diffuse.
+    juce::dsp::IIR::Filter<float> airFilterL, airFilterR;
 
     juce::AudioBuffer<float> reverbSendBuffer;
     juce::AudioBuffer<float> dryBuffer;
@@ -71,6 +78,7 @@ private:
     std::atomic<float>* mixParam = nullptr;
     std::atomic<float>* reverbAmountParam = nullptr;
     std::atomic<float>* reverbSizeParam = nullptr;
+    std::atomic<float>* distanceParam = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoirPracticeAudioProcessor)
 };

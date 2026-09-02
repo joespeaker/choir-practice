@@ -34,6 +34,7 @@ private:
     KnobControl mixKnob;
     KnobControl reverbKnob;
     KnobControl sizeKnob;
+    KnobControl distanceKnob;
 
     juce::Label titleLabel;
 

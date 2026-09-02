@@ -28,6 +28,7 @@ ChoirPracticeAudioProcessor::ChoirPracticeAudioProcessor()
     mixParam          = apvts.getRawParameterValue (ChoirParam::mix);
     reverbAmountParam = apvts.getRawParameterValue (ChoirParam::reverbAmount);
     reverbSizeParam   = apvts.getRawParameterValue (ChoirParam::reverbSize);
+    distanceParam     = apvts.getRawParameterValue (ChoirParam::distance);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ChoirPracticeAudioProcessor::createParameterLayout()
@@ -41,7 +42,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoirPracticeAudioProcessor:
         makePercentParam (ChoirParam::spread, "Spread", 50.0f),
         makePercentParam (ChoirParam::mix, "Mix", 50.0f),
         makePercentParam (ChoirParam::reverbAmount, "Reverb", 25.0f),
-        makePercentParam (ChoirParam::reverbSize, "Size", 55.0f));
+        makePercentParam (ChoirParam::reverbSize, "Size", 55.0f),
+        makePercentParam (ChoirParam::distance, "Distance", 25.0f));
 }
 
 void ChoirPracticeAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -61,6 +63,19 @@ void ChoirPracticeAudioProcessor::prepareToPlay (double sampleRate, int samplesP
     reverb.prepare (reverbSpec);
     reverb.reset();
 
+    reverbPredelay.setMaximumDelayInSamples ((int) (sampleRate * 0.05)); // 50 ms
+    reverbPredelay.prepare (reverbSpec);
+    reverbPredelay.reset();
+
+    juce::dsp::ProcessSpec monoSpec = reverbSpec;
+    monoSpec.numChannels = 1;
+    airFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass (sampleRate, 16000.0f);
+    airFilterR.coefficients = airFilterL.coefficients;
+    airFilterL.prepare (monoSpec);
+    airFilterR.prepare (monoSpec);
+    airFilterL.reset();
+    airFilterR.reset();
+
     reverbSendBuffer.setSize (2, samplesPerBlock);
     dryBuffer.setSize (2, samplesPerBlock);
 }
@@ -68,6 +83,9 @@ void ChoirPracticeAudioProcessor::prepareToPlay (double sampleRate, int samplesP
 void ChoirPracticeAudioProcessor::releaseResources()
 {
     reverb.reset();
+    reverbPredelay.reset();
+    airFilterL.reset();
+    airFilterR.reset();
     for (auto& v : choirVoices)
         v.reset();
 }
@@ -100,6 +118,7 @@ void ChoirPracticeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
     const float mix01      = mixParam->load() / 100.0f;
     const float reverbAmount01 = reverbAmountParam->load() / 100.0f;
     const float reverbSize01   = reverbSizeParam->load() / 100.0f;
+    const float distance01     = distanceParam->load() / 100.0f;
 
     for (int v = 0; v < numVoicesInUse; ++v)
         choirVoices[(size_t) v].updateBlockParams (v, numVoicesInUse, detune01, movement01, width01, spread01);
@@ -112,6 +131,23 @@ void ChoirPracticeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
     reverbParams.width      = 1.0f;
     reverbParams.freezeMode = 0.0f;
     reverb.setParameters (reverbParams);
+
+    // "Distance": as the choir moves away from the mic, the direct signal
+    // gets slightly quieter and duller (air absorption), a bigger share of
+    // it goes to the reverb send (more diffuse, less direct — the primary
+    // distance cue), and the reverb takes a little longer to respond
+    // (predelay), simulating the extra time for reflections to arrive.
+    const float airCutoffHz    = juce::jmap (distance01, 0.0f, 1.0f, 16000.0f, 2800.0f);
+    const float directGain     = juce::jmap (distance01, 0.0f, 1.0f, 1.0f, 0.72f);
+    const float reverbSendScale = juce::jmap (distance01, 0.0f, 1.0f, 1.0f, 1.8f);
+    const float predelayMs      = juce::jmap (distance01, 0.0f, 1.0f, 0.0f, 35.0f);
+
+    auto airCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass (getSampleRate(), airCutoffHz);
+    airFilterL.coefficients = airCoeffs;
+    airFilterR.coefficients = airCoeffs;
+
+    const float predelaySamples = (float) (getSampleRate() * (predelayMs / 1000.0));
+    reverbPredelay.setDelay (predelaySamples);
 
     reverbSendBuffer.setSize (2, numSamples, false, false, true);
     reverbSendBuffer.clear();
@@ -130,8 +166,11 @@ void ChoirPracticeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
         for (int v = 0; v < numVoicesInUse; ++v)
             choirVoices[(size_t) v].processSample (inputSample, wetL, wetR);
 
-        reverbSendBuffer.setSample (0, i, wetL * reverbAmount01);
-        reverbSendBuffer.setSample (1, i, wetR * reverbAmount01);
+        wetL = airFilterL.processSample (wetL) * directGain;
+        wetR = airFilterR.processSample (wetR) * directGain;
+
+        reverbSendBuffer.setSample (0, i, wetL * reverbAmount01 * reverbSendScale);
+        reverbSendBuffer.setSample (1, i, wetR * reverbAmount01 * reverbSendScale);
 
         buffer.setSample (0, i, wetL);
         if (numOutputChannels > 1)
@@ -140,6 +179,9 @@ void ChoirPracticeAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
 
     if (reverbAmount01 > 0.0001f)
     {
+        juce::dsp::AudioBlock<float> predelayBlock (reverbSendBuffer);
+        reverbPredelay.process (juce::dsp::ProcessContextReplacing<float> (predelayBlock));
+
         juce::dsp::AudioBlock<float> reverbBlock (reverbSendBuffer);
         juce::dsp::ProcessContextReplacing<float> reverbContext (reverbBlock);
         reverb.process (reverbContext);

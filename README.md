@@ -14,6 +14,12 @@ randomized LFO phase and rate, a small tone-colour variation, and its own
 spot in the stereo field, so the voices don't sound phase-locked to each
 other. The blend is then sent through a reverb for choir-in-a-room ambience.
 
+Distance is simulated the way real distance actually reads to the ear: not
+just quieter, but a bigger share of the sound going to the reverb relative
+to the direct signal, a little loss of high end (air absorption), and a
+short predelay before the reverb responds, as if reflections have farther
+to travel.
+
 Controls:
 
 | Knob | What it does |
@@ -23,6 +29,7 @@ Controls:
 | Movement | How fast that drift wanders |
 | Width | Stereo spread of the voices |
 | Spread | How far apart the voices sit in time (doubling amount) |
+| Distance | How far back the choir stands in the room / from the mic |
 | Mix | Dry/wet blend of the effect |
 | Reverb | Amount of reverb send |
 | Size | Reverb room size |

@@ -24,8 +24,9 @@ ChoirPracticeAudioProcessorEditor::ChoirPracticeAudioProcessorEditor (ChoirPract
     addKnob (mixKnob,      ChoirParam::mix,          "Mix");
     addKnob (reverbKnob,   ChoirParam::reverbAmount, "Reverb");
     addKnob (sizeKnob,     ChoirParam::reverbSize,   "Size");
+    addKnob (distanceKnob, ChoirParam::distance,     "Distance");
 
-    setSize (620, 320);
+    setSize (620, 420);
 }
 
 void ChoirPracticeAudioProcessorEditor::addKnob (KnobControl& knob, const juce::String& paramId, const juce::String& labelText)
@@ -58,19 +59,27 @@ void ChoirPracticeAudioProcessorEditor::resized()
     titleLabel.setBounds (area.removeFromTop (34));
     area.removeFromTop (8);
 
-    std::array<KnobControl*, 8> knobs {
-        &voicesKnob, &detuneKnob, &movementKnob, &widthKnob,
-        &spreadKnob, &mixKnob, &reverbKnob, &sizeKnob
+    std::array<KnobControl*, 9> knobs {
+        &voicesKnob, &detuneKnob, &movementKnob, &widthKnob, &spreadKnob,
+        &distanceKnob, &mixKnob, &reverbKnob, &sizeKnob
     };
 
-    const int numKnobs = (int) knobs.size();
-    const int knobWidth = area.getWidth() / numKnobs;
+    constexpr int numColumns = 5;
+    const int columnWidth = area.getWidth() / numColumns;
+    const int rowHeight = area.getHeight() / 2;
 
-    for (int i = 0; i < numKnobs; ++i)
+    for (size_t i = 0; i < knobs.size(); ++i)
     {
-        auto column = area.removeFromLeft (knobWidth);
-        auto labelBounds = column.removeFromBottom (20);
-        knobs[(size_t) i]->slider.setBounds (column.reduced (4));
-        knobs[(size_t) i]->label.setBounds (labelBounds);
+        const int row = (int) i / numColumns;
+        const int col = (int) i % numColumns;
+
+        auto cell = area.withTrimmedLeft (col * columnWidth)
+                        .withTrimmedTop (row * rowHeight)
+                        .withWidth (columnWidth)
+                        .withHeight (rowHeight);
+
+        auto labelBounds = cell.removeFromBottom (20);
+        knobs[i]->slider.setBounds (cell.reduced (4));
+        knobs[i]->label.setBounds (labelBounds);
     }
 }
