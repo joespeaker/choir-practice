@@ -1,0 +1,12 @@
+build/
+build-*/
+cmake-build-*/
+_deps/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+*.o
+*.obj
+.vs/
+.vscode/
