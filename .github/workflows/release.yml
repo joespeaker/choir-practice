@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag to publish (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
+
+      - name: Build AU, VST3 and Standalone
+        run: cmake --build build --config Release --target ChoirPractice_All -j4
+
+      - name: Package artefacts
+        run: |
+          set -euo pipefail
+          cd build/ChoirPractice_artefacts/Release
+          ditto -c -k --sequesterRsrc --keepParent "AU/Choir Practice.component" "ChoirPractice-AU-macOS-universal.zip"
+          ditto -c -k --sequesterRsrc --keepParent "VST3/Choir Practice.vst3" "ChoirPractice-VST3-macOS-universal.zip"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Choir Practice ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            build/ChoirPractice_artefacts/Release/ChoirPractice-AU-macOS-universal.zip
+            build/ChoirPractice_artefacts/Release/ChoirPractice-VST3-macOS-universal.zip
+          body: |
+            Unsigned, ad-hoc build — not notarized by Apple.
+
+            After downloading and unzipping into your plugin folders, macOS
+            Gatekeeper will likely quarantine the files since they came from
+            the internet. Before opening Logic Pro, clear the quarantine flag:
+
+            ```sh
+            xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Choir Practice.component"
+            xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/"Choir Practice.vst3"
+            ```
+
+            Then rescan plugins in Logic Pro (Preferences → Audio → Plug-In Manager).

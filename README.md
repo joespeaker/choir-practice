@@ -4,6 +4,21 @@ An Audio Unit / VST3 plugin that turns a single vocal into a choir. Built with
 [JUCE](https://juce.com), installs into Logic Pro (and any other AU/VST3 host)
 on macOS.
 
+## Download
+
+Prebuilt AU and VST3 builds are published on the
+[Releases page](../../releases) — download the zip for the format you want,
+unzip it into your plugin folder
+(`~/Library/Audio/Plug-Ins/Components` for AU,
+`~/Library/Audio/Plug-Ins/VST3` for VST3), then follow the Gatekeeper note in
+the release description before opening Logic Pro (these are unsigned, ad-hoc
+builds, not notarized by Apple).
+
+New releases are built automatically by
+[`.github/workflows/release.yml`](.github/workflows/release.yml): push a
+`v*` tag, or run the workflow manually from the Actions tab with a version
+like `v1.0.0`.
+
 ## How it works
 
 Rather than a true pitch-shifter, each of up to 8 "voices" runs the input
@@ -34,12 +49,13 @@ Controls:
 | Reverb | Amount of reverb send |
 | Size | Reverb room size |
 
-## Requirements
+## Build from source
 
-- macOS with Xcode (command line tools are enough) and CMake 3.22+
-- Internet access on first configure (CMake fetches JUCE via `FetchContent`)
+Only needed if you're not using a [prebuilt release](../../releases).
 
-## Build
+Requirements: macOS with Xcode (command line tools are enough) and CMake
+3.22+; internet access on first configure (CMake fetches JUCE via
+`FetchContent`).
 
 ```sh
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -71,10 +87,3 @@ If `auval` reports `PASS`, the component is well-formed.
    from there — more voices and width read as a bigger choir, more detune
    and movement read as a looser, more human blend.
 
-## Note on this build
-
-This project was scaffolded and the DSP/UI code written in a Linux
-container without Xcode or the AudioUnit SDK, so it hasn't been compiled or
-`auval`-validated yet. Build it on your Mac first and let me know what, if
-anything, doesn't compile — CMake/JUCE error messages are usually specific
-enough to fix quickly.
